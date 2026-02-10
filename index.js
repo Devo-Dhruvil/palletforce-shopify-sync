@@ -25,6 +25,7 @@ const shopify = axios.create({
 // =====================
 const EVENT_TAG_MAP = {
   SCOT: "Scanned on Trunk",
+  ARRH: "Arrived At Hub",
   DELV: "Scanned on Delivery Vehicle",
   POD: "POD Received"
 };
