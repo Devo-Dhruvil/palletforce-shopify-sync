@@ -1,18 +1,12 @@
-const express = require("express");
 const axios = require("axios");
-const cron = require("node-cron");
 require("dotenv").config();
-
-const app = express();
-app.use(express.json());
 
 const {
   SHOPIFY_STORE,
   SHOPIFY_TOKEN,
   SHOPIFY_API_VERSION,
   PALLETFORCE_URL,
-  PALLETFORCE_ACCESS_KEY,
-  PORT
+  PALLETFORCE_ACCESS_KEY
 } = process.env;
 
 // =====================
@@ -53,6 +47,7 @@ async function getTrackingStatus(trackingNumber) {
     accessKey: PALLETFORCE_ACCESS_KEY,
     trackingNumber
   });
+
   return res.data.trackingData || [];
 }
 
@@ -62,7 +57,7 @@ async function getTrackingStatus(trackingNumber) {
 async function updateOrderTag(order, newTag) {
   let tags = order.tags ? order.tags.split(", ") : [];
 
-  // Remove old Palletforce tags
+  // Remove old Palletforce status tags
   tags = tags.filter(tag => !STATUS_TAGS.includes(tag));
 
   // Add new tag
@@ -77,10 +72,10 @@ async function updateOrderTag(order, newTag) {
 }
 
 // =====================
-// MAIN PROCESS
+// MAIN RUN (ONCE)
 // =====================
-async function syncOrders() {
-  console.log("⏳ Palletforce sync started");
+async function run() {
+  console.log("⏳ GitHub Action: Palletforce sync started");
 
   const orders = await getOrders();
 
@@ -109,20 +104,11 @@ async function syncOrders() {
       `✔ Order ${order.id} → ${newTag}`
     );
   }
+
+  console.log("✅ Sync finished");
 }
 
-// =====================
-// RUN EVERY 1 HOUR
-// =====================
-cron.schedule("0 * * * *", async () => {
-  try {
-    await syncOrders();
-  } catch (err) {
-    console.error("❌ Error:", err.message);
-  }
-});
-
-// =====================
-app.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
+run().catch(err => {
+  console.error("❌ Error:", err.message);
+  process.exit(1);
 });
