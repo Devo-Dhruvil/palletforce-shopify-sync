@@ -30,3 +30,7 @@ jobs:
           SHOPIFY_API_VERSION: 2024-01
           PALLETFORCE_URL: https://apiuat.palletforce.net/api/ExternalScanning/DownloadTracking
           PALLETFORCE_ACCESS_KEY: ${{ secrets.PALLETFORCE_ACCESS_KEY }}
+
+           # 🔽 TEST MODE (REQUIRED)
+          TEST_MODE: ${{ secrets.TEST_MODE }}
+          TEST_ORDER_ID: ${{ secrets.TEST_ORDER_ID }}
