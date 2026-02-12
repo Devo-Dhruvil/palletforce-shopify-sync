@@ -25,11 +25,16 @@ const shopify = axios.create({
 // =====================
 const EVENT_TAG_MAP = {
   SCOT: "status_in_transit",
-  ARRH: "status_processing", 
+  ARRH: "status_processing",
+  DELV: "status_in_transit",
   POD: "status_delivered"
 };
 
-const STATUS_TAGS = Object.values(EVENT_TAG_MAP);
+const STATUS_TAGS = [
+  "status_processing",
+  "status_in_transit",
+  "status_delivered"
+];
 
 // =====================
 // GET SHOPIFY ORDERS
@@ -57,10 +62,10 @@ async function getTrackingStatus(trackingNumber) {
 async function updateOrderTag(order, newTag) {
   let tags = order.tags ? order.tags.split(", ") : [];
 
-  // Remove old Palletforce status tags
+  // Remove existing status tags
   tags = tags.filter(tag => !STATUS_TAGS.includes(tag));
 
-  // Add new tag
+  // Add new status tag
   tags.push(newTag);
 
   await shopify.put(`/orders/${order.id}.json`, {
@@ -80,6 +85,10 @@ async function run() {
   const orders = await getOrders();
 
   for (const order of orders) {
+
+    // Skip delivered orders
+    if (order.tags?.includes("status_delivered")) continue;
+
     const trackingNumber =
       order.fulfillments?.[0]?.tracking_number;
 
@@ -100,9 +109,7 @@ async function run() {
 
     await updateOrderTag(order, newTag);
 
-    console.log(
-      `✔ Order ${order.id} → ${newTag}`
-    );
+    console.log(`✔ Order ${order.id} → ${newTag}`);
   }
 
   console.log("✅ Sync finished");
