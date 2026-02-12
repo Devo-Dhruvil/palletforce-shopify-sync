@@ -154,7 +154,11 @@ async function run() {
     await updateOrderTag(order, newTag);
 
     // Add tracking number when order is in transit
-if (newTag === "status_in_transit") {
+// Add tracking when order is in transit OR delivered
+if (
+  newTag === "status_in_transit" ||
+  newTag === "status_delivered"
+) {
   await saveTrackingToShopify(order, trackingNumber);
 }
 
