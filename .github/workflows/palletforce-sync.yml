@@ -2,7 +2,7 @@ name: Palletforce Shopify Sync
 
 on:
   schedule:
-    - cron: "*/2 * * * *"   # Every 1 hour
+    - cron: "0 * * * *"   # Every 1 hour
     
   workflow_dispatch:     # Manual run button
 
