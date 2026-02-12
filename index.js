@@ -48,7 +48,16 @@ const STATUS_TAGS = [
 // =====================
 // TEST EVENTS (SIMULATION)
 // =====================
-const TEST_EVENTS = ["ARRH", "SCOT", "DELV", "POD"];
+ function getNextTestEvent(order) {
+  const tags = order.tags ? order.tags.split(", ") : [];
+
+  if (tags.includes("status_processing")) return "SCOT";
+  if (tags.includes("status_in_transit")) return "POD";
+
+  // First run (no status tag yet)
+  return "ARRH";
+}
+
 
 // =====================
 // GET SHOPIFY ORDERS
@@ -118,17 +127,16 @@ async function run() {
     // =====================
     // TEST MODE (NO PALLETFORCE)
     // =====================
-    if (TEST_MODE) {
-      const randomEvent =
-        TEST_EVENTS[Math.floor(Math.random() * TEST_EVENTS.length)];
+ if (TEST_MODE) {
+  const nextEvent = getNextTestEvent(order);
 
-      latestEvent = { eventCode: randomEvent };
+  latestEvent = { eventCode: nextEvent };
 
-      console.log(
-        `🧪 TEST MODE → Order ${order.id}, simulated event: ${randomEvent}`
-      );
-
-    } else {
+  console.log(
+    `🧪 TEST MODE → Order ${order.id}, simulated event: ${nextEvent}`
+  );
+}
+ else {
       // =====================
       // REAL PALLETFORCE MODE
       // =====================
