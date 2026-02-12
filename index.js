@@ -24,8 +24,8 @@ const shopify = axios.create({
 // EVENT CODE → TAG MAP
 // =====================
 const EVENT_TAG_MAP = {
-  SCOT: "status_in_transit",
-  ARRH: "status_processing",
+  SCOT: "status_processing",
+  ARRH: "status_in_transit",
   DELV: "status_in_transit",
   POD: "status_delivered"
 };
