@@ -56,6 +56,50 @@ async function getTrackingStatus(trackingNumber) {
   return res.data.trackingData || [];
 }
 
+
+// ===============================
+// SAVE TRACKING TO SHOPIFY
+// ===============================
+async function saveTrackingToShopify(order, trackingNumber) {
+  // Do not add tracking twice
+  if (order.fulfillments?.some(f => f.tracking_number)) {
+    console.log("ℹ️ Tracking already exists — skipping");
+    return;
+  }
+
+  const foRes = await shopify.get(
+    `/orders/${order.id}/fulfillment_orders.json`
+  );
+
+  const fulfillmentOrder = foRes.data.fulfillment_orders?.find(
+    fo => fo.status === "open"
+  );
+
+  if (!fulfillmentOrder) {
+    console.log("⚠️ No open fulfillment order — skipping");
+    return;
+  }
+
+  await shopify.post(`/fulfillments.json`, {
+    fulfillment: {
+      line_items_by_fulfillment_order: [
+        { fulfillment_order_id: fulfillmentOrder.id }
+      ],
+      tracking_info: {
+        number: trackingNumber,
+        company: "Palletforce",
+        url: `https://www.palletforce.com/track/?tracking=${trackingNumber}`
+      },
+      notify_customer: true
+    }
+  });
+
+  console.log("✅ Tracking saved to Shopify:", trackingNumber);
+}
+
+
+
+
 // =====================
 // UPDATE SHOPIFY TAG
 // =====================
@@ -108,6 +152,12 @@ async function run() {
     if (!newTag) continue;
 
     await updateOrderTag(order, newTag);
+
+    // Add tracking number when order is in transit
+if (newTag === "status_in_transit") {
+  await saveTrackingToShopify(order, trackingNumber);
+}
+
 
     console.log(`✔ Order ${order.id} → ${newTag}`);
   }
