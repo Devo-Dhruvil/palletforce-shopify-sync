@@ -1,6 +1,15 @@
 const axios = require("axios");
 require("dotenv").config();
 
+// =====================
+// TEST MODE CONFIG
+// =====================
+const TEST_MODE = process.env.TEST_MODE === "true";
+const TEST_ORDER_ID = process.env.TEST_ORDER_ID;
+
+// =====================
+// ENV VARIABLES
+// =====================
 const {
   SHOPIFY_STORE,
   SHOPIFY_TOKEN,
@@ -37,6 +46,11 @@ const STATUS_TAGS = [
 ];
 
 // =====================
+// TEST EVENTS (SIMULATION)
+// =====================
+const TEST_EVENTS = ["ARRH", "SCOT", "DELV", "POD"];
+
+// =====================
 // GET SHOPIFY ORDERS
 // =====================
 async function getOrders() {
@@ -52,7 +66,6 @@ async function getTrackingStatus(trackingNumber) {
     accessKey: PALLETFORCE_ACCESS_KEY,
     trackingNumber
   });
-
   return res.data.trackingData || [];
 }
 
@@ -62,7 +75,7 @@ async function getTrackingStatus(trackingNumber) {
 async function updateOrderTag(order, newTag) {
   let tags = order.tags ? order.tags.split(", ") : [];
 
-  // Remove existing status tags
+  // Remove existing status_* tags
   tags = tags.filter(tag => !STATUS_TAGS.includes(tag));
 
   // Add new status tag
@@ -80,11 +93,17 @@ async function updateOrderTag(order, newTag) {
 // MAIN RUN (ONCE)
 // =====================
 async function run() {
-  console.log("⏳ GitHub Action: Palletforce sync started");
+  console.log("⏳ GitHub Action started");
+  console.log("🧪 TEST MODE:", TEST_MODE);
 
   const orders = await getOrders();
 
   for (const order of orders) {
+
+    // TEST MODE → only one order
+    if (TEST_MODE && order.id.toString() !== TEST_ORDER_ID) {
+      continue;
+    }
 
     // Skip delivered orders
     if (order.tags?.includes("status_delivered")) continue;
@@ -92,15 +111,35 @@ async function run() {
     const trackingNumber =
       order.fulfillments?.[0]?.tracking_number;
 
-    if (!trackingNumber) continue;
+    if (!trackingNumber && !TEST_MODE) continue;
 
-    const trackingData =
-      await getTrackingStatus(trackingNumber);
+    let latestEvent;
 
-    if (!trackingData.length) continue;
+    // =====================
+    // TEST MODE (NO PALLETFORCE)
+    // =====================
+    if (TEST_MODE) {
+      const randomEvent =
+        TEST_EVENTS[Math.floor(Math.random() * TEST_EVENTS.length)];
 
-    const latestEvent =
-      trackingData[trackingData.length - 1];
+      latestEvent = { eventCode: randomEvent };
+
+      console.log(
+        `🧪 TEST MODE → Order ${order.id}, simulated event: ${randomEvent}`
+      );
+
+    } else {
+      // =====================
+      // REAL PALLETFORCE MODE
+      // =====================
+      const trackingData =
+        await getTrackingStatus(trackingNumber);
+
+      if (!trackingData.length) continue;
+
+      latestEvent =
+        trackingData[trackingData.length - 1];
+    }
 
     const newTag =
       EVENT_TAG_MAP[latestEvent.eventCode];
@@ -115,6 +154,7 @@ async function run() {
   console.log("✅ Sync finished");
 }
 
+// =====================
 run().catch(err => {
   console.error("❌ Error:", err.message);
   process.exit(1);
