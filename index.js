@@ -57,18 +57,22 @@ async function getTrackingStatus(trackingNumber) {
 }
 
 
+
+
+
 // ===============================
 // SAVE TRACKING TO SHOPIFY
 // ===============================
-async function saveTrackingToShopify(order, trackingNumber) {
-  // Do not add tracking twice
-  if (order.fulfillments?.some(f => f.tracking_number)) {
-    console.log("ℹ️ Tracking already exists — skipping");
-    return;
-  }
+async function saveTrackingToShopify(orderId, trackingNumber) {
+  const baseUrl = `https://${process.env.SHOPIFY_SHOP}/admin/api/2024-01`;
 
-  const foRes = await shopify.get(
-    `/orders/${order.id}/fulfillment_orders.json`
+  const foRes = await axios.get(
+    `${baseUrl}/orders/${orderId}/fulfillment_orders.json`,
+    {
+      headers: {
+        "X-Shopify-Access-Token": process.env.SHOPIFY_ADMIN_ACCESS_TOKEN,
+      },
+    }
   );
 
   const fulfillmentOrder = foRes.data.fulfillment_orders?.find(
@@ -76,27 +80,35 @@ async function saveTrackingToShopify(order, trackingNumber) {
   );
 
   if (!fulfillmentOrder) {
-    console.log("⚠️ No open fulfillment order — skipping");
+    console.log("⚠️ No open fulfillment order — skipping Shopify update");
     return;
   }
 
-  await shopify.post(`/fulfillments.json`, {
-    fulfillment: {
-      line_items_by_fulfillment_order: [
-        { fulfillment_order_id: fulfillmentOrder.id }
-      ],
-      tracking_info: {
-        number: trackingNumber,
-        company: "Palletforce",
-        url: `https://www.palletforce.com/track/?tracking=${trackingNumber}`
+  await axios.post(
+    `${baseUrl}/fulfillments.json`,
+    {
+      fulfillment: {
+        line_items_by_fulfillment_order: [
+          { fulfillment_order_id: fulfillmentOrder.id },
+        ],
+        tracking_info: {
+          number: trackingNumber,
+          company: "Palletforce",
+          url: `https://www.palletforce.com/track/?tracking=${trackingNumber}`,
+        },
+        notify_customer: true,
       },
-      notify_customer: true
+    },
+    {
+      headers: {
+        "X-Shopify-Access-Token": process.env.SHOPIFY_ADMIN_ACCESS_TOKEN,
+        "Content-Type": "application/json",
+      },
     }
-  });
+  );
 
   console.log("✅ Tracking saved to Shopify:", trackingNumber);
 }
-
 
 
 
@@ -155,11 +167,12 @@ async function run() {
 
     // Add tracking number when order is in transit
 // Add tracking when order is in transit OR delivered
+// After updating the order tag
 if (
   newTag === "status_in_transit" ||
   newTag === "status_delivered"
 ) {
-  await saveTrackingToShopify(order, trackingNumber);
+  await saveTrackingToShopify(order.id, trackingNumber);
 }
 
 
