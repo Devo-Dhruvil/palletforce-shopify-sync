@@ -40,8 +40,21 @@ const STATUS_TAGS = [
 // GET SHOPIFY ORDERS
 // =====================
 async function getOrders() {
-  const res = await shopify.get(`/orders.json?status=any&limit=50`);
+  const res = await shopify.get(`/orders.json?status=any&limit=50&fields=id,name,tags`);
   return res.data.orders;
+}
+
+async function getTrackingFromMetafield(orderId) {
+  const res = await shopify.get(
+    `/orders/${orderId}/metafields.json`
+  );
+
+  const mf = res.data.metafields.find(
+    m => m.namespace === "custom" &&
+         m.key === "palletforce_tracking"
+  );
+
+  return mf?.value || null;
 }
 
 // =====================
@@ -112,31 +125,42 @@ async function run() {
 
   for (const order of orders) {
 
-    // 1️⃣ Ask Palletforce using Shopify order number
-    const trackingData = await getTrackingStatus(order.name);
-    if (!trackingData.length) continue;
+  const palletTracking = await getTrackingFromMetafield(order.id);
 
-    // 2️⃣ Get latest Palletforce event
-    const latestEvent = trackingData[trackingData.length - 1];
-
-    const palletTracking = latestEvent.trackingNumber;
-    const newTag = EVENT_TAG_MAP[latestEvent.eventCode];
-
-    if (!palletTracking || !newTag) continue;
-
-    // 3️⃣ Update Shopify tag
-    await updateOrderTag(order, newTag);
-
-    // 4️⃣ Add tracking if in transit or delivered
-    if (
-      newTag === "status_in_transit" ||
-      newTag === "status_delivered"
-    ) {
-      await saveTrackingToShopify(order.id, palletTracking);
-    }
-
-    console.log(`✔ Order ${order.id} → ${newTag} → ${palletTracking}`);
+  if (!palletTracking) {
+    console.log(`⏭ Order ${order.id} — No metafield tracking`);
+    continue;
   }
+
+  const trackingData = await getTrackingStatus(palletTracking);
+
+  if (!trackingData.length) {
+    console.log(`⏭ Order ${order.id} — No Palletforce data`);
+    continue;
+  }
+
+  const latestEvent =
+    trackingData[trackingData.length - 1];
+
+  const newTag =
+    EVENT_TAG_MAP[latestEvent.eventCode];
+
+  if (!newTag) continue;
+
+  await updateOrderTag(order, newTag);
+
+  if (
+    newTag === "status_in_transit" ||
+    newTag === "status_delivered"
+  ) {
+    await saveTrackingToShopify(order.id, palletTracking);
+  }
+
+  console.log(
+    `✔ Order ${order.id} → ${newTag}`
+  );
+}
+
 
   console.log("✅ Sync finished");
 }
