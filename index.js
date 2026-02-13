@@ -71,6 +71,20 @@ async function getTrackingStatus(trackingNumber) {
 // ===============================
 // SAVE TRACKING TO SHOPIFY
 // ===============================
+
+
+const orderRes = await shopify.get(`/orders/${orderId}.json`);
+const existingTracking =
+  orderRes.data.order.fulfillments?.some(
+    f => f.tracking_number === trackingNumber
+  );
+
+if (existingTracking) {
+  console.log(`⏭ Order ${orderId}: Tracking already exists`);
+  return;
+}
+
+
 async function saveTrackingToShopify(orderId, trackingNumber) {
   const foRes = await shopify.get(
     `/orders/${orderId}/fulfillment_orders.json`
@@ -113,6 +127,11 @@ async function updateOrderTag(order, newTag) {
   await shopify.put(`/orders/${order.id}.json`, {
     order: { id: order.id, tags: tags.join(", ") }
   });
+}
+
+if (order.tags?.includes(newTag)) {
+  console.log(`⏭ Order ${order.id}: Tag already ${newTag}`);
+  continue;
 }
 
 // =====================
