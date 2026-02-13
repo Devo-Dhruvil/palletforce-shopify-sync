@@ -75,25 +75,25 @@ async function getTrackingStatus(trackingNumber) {
 
 async function saveTrackingToShopify(orderId, trackingNumber) {
 
-  // Get full order
   const orderRes = await shopify.get(`/orders/${orderId}.json`);
   const order = orderRes.data.order;
 
-  // 1️⃣ If already fulfilled → update tracking
+  // 1️⃣ If already fulfilled → update tracking (CORRECT endpoint)
   if (order.fulfillments && order.fulfillments.length > 0) {
 
     const fulfillmentId = order.fulfillments[0].id;
 
-    await shopify.put(`/fulfillments/${fulfillmentId}.json`, {
-      fulfillment: {
-        id: fulfillmentId,
+    await shopify.post(
+      `/fulfillments/${fulfillmentId}/update_tracking.json`,
+      {
         tracking_info: {
           number: trackingNumber,
           company: "Palletforce",
           url: `https://www.palletforce.com/track/?tracking=${trackingNumber}`
-        }
+        },
+        notify_customer: true
       }
-    });
+    );
 
     console.log(`🔄 Tracking updated for fulfilled order ${orderId}`);
     return;
@@ -129,6 +129,7 @@ async function saveTrackingToShopify(orderId, trackingNumber) {
 
   console.log(`✅ Tracking created for order ${orderId}`);
 }
+
 
 
 // =====================
