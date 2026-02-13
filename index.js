@@ -109,44 +109,34 @@ async function run() {
   console.log("⏳ Palletforce Shopify sync started");
 
   const orders = await getOrders();
+for (const order of orders) {
 
-  for (const order of orders) {
+  // 1️⃣ Ask Palletforce using Shopify order number
+  const trackingData = await getTrackingStatus(order.name);
+  if (!trackingData.length) continue;
 
-    // const palletTracking =
-    //   order.note_attributes?.find(n => n.name === "trackingNumber")?.value;
+  // 2️⃣ Get latest Palletforce event
+  const latestEvent = trackingData[trackingData.length - 1];
 
-    // if (!palletTracking) continue;
+  const palletTracking = latestEvent.trackingNumber;
+  const newTag = EVENT_TAG_MAP[latestEvent.eventCode];
 
-    const trackingData = await getTrackingStatus(order.name);
-if (!trackingData.length) continue;
+  if (!palletTracking || !newTag) continue;
 
-const latestEvent = trackingData[trackingData.length - 1];
-const palletTracking = latestEvent.trackingNumber;
+  // 3️⃣ Update Shopify tag
+  await updateOrderTag(order, newTag);
 
-    
-
-    const trackingData = await getTrackingStatus(palletTracking);
-    if (!trackingData.length) continue;
-
-    const latestEvent = trackingData[trackingData.length - 1];
-    const newTag = EVENT_TAG_MAP[latestEvent.eventCode];
-    if (!newTag) continue;
-
-    await updateOrderTag(order, newTag);
-
-    // ADD TRACKING ON IN-TRANSIT OR DELIVERED
-    if (
-      newTag === "status_in_transit" ||
-      newTag === "status_delivered"
-    ) {
-      await saveTrackingToShopify(order.id, palletTracking);
-    }
-
-    console.log(`✔ Order ${order.id} → ${newTag}`);
+  // 4️⃣ Add tracking if in transit or delivered
+  if (
+    newTag === "status_in_transit" ||
+    newTag === "status_delivered"
+  ) {
+    await saveTrackingToShopify(order.id, palletTracking);
   }
 
-  console.log("✅ Sync finished");
+  console.log(`✔ Order ${order.id} → ${newTag} → ${palletTracking}`);
 }
+
 
 run().catch(err => {
   console.error("❌ Error:", err.response?.data || err.message);
