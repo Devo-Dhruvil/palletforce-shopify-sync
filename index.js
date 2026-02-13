@@ -84,19 +84,22 @@ async function saveTrackingToShopify(orderId, trackingNumber) {
     const fulfillmentId = order.fulfillments[0].id;
 
     await shopify.post(
-      `/fulfillments/${fulfillmentId}/update_tracking.json`,
-      {
-        tracking_info: {
-          number: trackingNumber,
-          company: "Palletforce",
-          url: `https://www.palletforce.com/track/?tracking=${trackingNumber}`
-        },
-        notify_customer: true
-      }
-    );
+  `/fulfillments/${fulfillmentId}/update_tracking.json`,
+  {
+    fulfillment: {
+      tracking_info: {
+        number: trackingNumber,
+        company: "Palletforce",
+        url: `https://www.palletforce.com/track/?tracking=${trackingNumber}`
+      },
+      notify_customer: true
+    }
+  }
+);
 
-    console.log(`🔄 Tracking updated for fulfilled order ${orderId}`);
-    return;
+console.log(`🔄 Tracking updated for fulfilled order ${orderId}`);
+return;
+
   }
 
   // 2️⃣ If unfulfilled → create fulfillment
