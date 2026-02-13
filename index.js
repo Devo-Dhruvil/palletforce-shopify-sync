@@ -10,7 +10,7 @@ const {
 } = process.env;
 
 // =====================
-// SHOPIFY CONNECTION (ADMIN TOKEN)
+// SHOPIFY CONNECTION
 // =====================
 const shopify = axios.create({
   baseURL: `https://${SHOPIFY_STORE}/admin/api/${SHOPIFY_API_VERSION}`,
@@ -21,7 +21,7 @@ const shopify = axios.create({
 });
 
 // =====================
-// EVENT CODE → TAG MAP
+// EVENT → TAG MAP
 // =====================
 const EVENT_TAG_MAP = {
   SCOT: "status_processing",
@@ -30,67 +30,66 @@ const EVENT_TAG_MAP = {
   POD: "status_delivered"
 };
 
-const STATUS_TAGS = [
-  "status_processing",
-  "status_in_transit",
-  "status_delivered"
-];
+const STATUS_TAGS = Object.values(EVENT_TAG_MAP);
 
 // =====================
-// GET SHOPIFY ORDERS
+// GET ORDERS
 // =====================
 async function getOrders() {
-  const res = await shopify.get(`/orders.json?status=any&limit=50&fields=id,name,tags`);
+  const res = await shopify.get(
+    `/orders.json?status=any&limit=50&fields=id,tags`
+  );
   return res.data.orders;
 }
 
+// =====================
+// GET METAFIELD TRACKING
+// =====================
 async function getTrackingFromMetafield(orderId) {
   const res = await shopify.get(
     `/orders/${orderId}/metafields.json`
   );
 
   const mf = res.data.metafields.find(
-    m => m.namespace === "custom" &&
-         m.key === "palletforce_tracking"
+    m => m.namespace === "custom" && m.key === "palletforce_tracking"
   );
 
   return mf?.value || null;
 }
 
 // =====================
-// PALLETFORCE TRACKING
+// PALLETFORCE API
 // =====================
 async function getTrackingStatus(trackingNumber) {
   const res = await axios.post(PALLETFORCE_URL, {
     accessKey: PALLETFORCE_ACCESS_KEY,
     trackingNumber
   });
+
   return res.data.trackingData || [];
 }
 
-// ===============================
-// SAVE TRACKING TO SHOPIFY
-// ===============================
-
-
-const orderRes = await shopify.get(`/orders/${orderId}.json`);
-const existingTracking =
-  orderRes.data.order.fulfillments?.some(
-    f => f.tracking_number === trackingNumber
-  );
-
-if (existingTracking) {
-  console.log(`⏭ Order ${orderId}: Tracking already exists`);
-  return;
-}
-
-
+// =====================
+// SAVE TRACKING (SAFE)
+// =====================
 async function saveTrackingToShopify(orderId, trackingNumber) {
+  // ⛔ Prevent duplicate tracking
+  const orderRes = await shopify.get(`/orders/${orderId}.json`);
+  const alreadyExists =
+    orderRes.data.order.fulfillments?.some(
+      f => f.tracking_number === trackingNumber
+    );
+
+  if (alreadyExists) {
+    console.log(`⏭ Order ${orderId}: Tracking already exists`);
+    return;
+  }
+
   const foRes = await shopify.get(
     `/orders/${orderId}/fulfillment_orders.json`
   );
 
-  const fulfillmentOrder = foRes.data.fulfillment_orders?.find(
+  const fulfillmentOrder = foRes.data.fulfillment_orders.find(
     fo => fo.status === "open"
   );
 
@@ -113,15 +112,20 @@ async function saveTrackingToShopify(orderId, trackingNumber) {
     }
   });
 
-  console.log(`✅ Tracking saved → ${trackingNumber}`);
+  console.log(`✅ Tracking added → ${trackingNumber}`);
 }
 
 // =====================
-// UPDATE SHOPIFY TAG
+// UPDATE TAG
 // =====================
 async function updateOrderTag(order, newTag) {
+  if (order.tags?.includes(newTag)) {
+    console.log(`⏭ Order ${order.id}: Tag already ${newTag}`);
+    return;
+  }
+
   let tags = order.tags ? order.tags.split(", ") : [];
-  tags = tags.filter(tag => !STATUS_TAGS.includes(tag));
+  tags = tags.filter(t => !STATUS_TAGS.includes(t));
   tags.push(newTag);
 
   await shopify.put(`/orders/${order.id}.json`, {
@@ -129,61 +133,39 @@ async function updateOrderTag(order, newTag) {
   });
 }
 
-if (order.tags?.includes(newTag)) {
-  console.log(`⏭ Order ${order.id}: Tag already ${newTag}`);
-  continue;
-}
-
 // =====================
-// MAIN RUN
+// MAIN
 // =====================
 async function run() {
-  console.log("⏳ Palletforce Shopify sync started");
+  console.log("⏳ Palletforce sync started");
 
   const orders = await getOrders();
 
   for (const order of orders) {
+    const trackingNumber = await getTrackingFromMetafield(order.id);
+    if (!trackingNumber) continue;
 
-  const palletTracking = await getTrackingFromMetafield(order.id);
+    const trackingData = await getTrackingStatus(trackingNumber);
+    if (!trackingData.length) continue;
 
-  if (!palletTracking) {
-    console.log(`⏭ Order ${order.id} — No metafield tracking`);
-    continue;
+    const latestEvent = trackingData[trackingData.length - 1];
+    const newTag = EVENT_TAG_MAP[latestEvent.eventCode];
+    if (!newTag) continue;
+
+    await updateOrderTag(order, newTag);
+
+    if (
+      newTag === "status_in_transit" ||
+      newTag === "status_delivered"
+    ) {
+      await saveTrackingToShopify(order.id, trackingNumber);
+    }
+
+    console.log(`✔ Order ${order.id} → ${newTag}`);
   }
-
-  const trackingData = await getTrackingStatus(palletTracking);
-
-  if (!trackingData.length) {
-    console.log(`⏭ Order ${order.id} — No Palletforce data`);
-    continue;
-  }
-
-  const latestEvent =
-    trackingData[trackingData.length - 1];
-
-  const newTag =
-    EVENT_TAG_MAP[latestEvent.eventCode];
-
-  if (!newTag) continue;
-
-  await updateOrderTag(order, newTag);
-
-  if (
-    newTag === "status_in_transit" ||
-    newTag === "status_delivered"
-  ) {
-    await saveTrackingToShopify(order.id, palletTracking);
-  }
-
-  console.log(
-    `✔ Order ${order.id} → ${newTag}`
-  );
-}
-
 
   console.log("✅ Sync finished");
 }
-
 
 run().catch(err => {
   console.error("❌ Error:", err.response?.data || err.message);
