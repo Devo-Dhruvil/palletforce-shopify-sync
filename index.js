@@ -112,10 +112,18 @@ async function run() {
 
   for (const order of orders) {
 
-    const palletTracking =
-      order.note_attributes?.find(n => n.name === "trackingNumber")?.value;
+    // const palletTracking =
+    //   order.note_attributes?.find(n => n.name === "trackingNumber")?.value;
 
-    if (!palletTracking) continue;
+    // if (!palletTracking) continue;
+
+    const trackingData = await getTrackingStatus(order.name);
+if (!trackingData.length) continue;
+
+const latestEvent = trackingData[trackingData.length - 1];
+const palletTracking = latestEvent.trackingNumber;
+
+    
 
     const trackingData = await getTrackingStatus(palletTracking);
     if (!trackingData.length) continue;
