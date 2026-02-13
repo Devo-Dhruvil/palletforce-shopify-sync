@@ -73,46 +73,23 @@ async function getTrackingStatus(trackingNumber) {
 // SAVE TRACKING (SAFE)
 // =====================
 
+ // ===============================
+// SAVE TRACKING TO SHOPIFY (OPTION A – SAFE)
+// ===============================
 async function saveTrackingToShopify(orderId, trackingNumber) {
 
-  const orderRes = await shopify.get(`/orders/${orderId}.json`);
-  const order = orderRes.data.order;
-
-  // 1️⃣ If already fulfilled → update tracking (CORRECT endpoint)
-  if (order.fulfillments && order.fulfillments.length > 0) {
-
-    const fulfillmentId = order.fulfillments[0].id;
-
-    await shopify.post(
-  `/fulfillments/${fulfillmentId}/update_tracking.json`,
-  {
-    fulfillment: {
-      tracking_info: {
-        number: trackingNumber,
-        company: "Palletforce",
-        url: `https://www.palletforce.com/track/?tracking=${trackingNumber}`
-      },
-      notify_customer: true
-    }
-  }
-);
-
-console.log(`🔄 Tracking updated for fulfilled order ${orderId}`);
-return;
-
-  }
-
-  // 2️⃣ If unfulfilled → create fulfillment
   const foRes = await shopify.get(
     `/orders/${orderId}/fulfillment_orders.json`
   );
 
-  const fulfillmentOrder = foRes.data.fulfillment_orders.find(
+  const fulfillmentOrder = foRes.data.fulfillment_orders?.find(
     fo => fo.status === "open"
   );
 
   if (!fulfillmentOrder) {
-    console.log(`⚠️ Order ${orderId}: No open fulfillment order`);
+    console.log(
+      `⏭ Order ${orderId}: Fulfillment not open — skipping tracking`
+    );
     return;
   }
 
@@ -132,7 +109,6 @@ return;
 
   console.log(`✅ Tracking created for order ${orderId}`);
 }
-
 
 
 // =====================
