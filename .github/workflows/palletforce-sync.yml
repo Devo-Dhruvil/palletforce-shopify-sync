@@ -3,8 +3,7 @@ name: Palletforce Shopify Sync
 on:
   schedule:
     - cron: "0 * * * *"   # Every 1 hour
-    
-  workflow_dispatch:     # Manual run button
+  workflow_dispatch:
 
 jobs:
   sync:
@@ -23,15 +22,10 @@ jobs:
         run: npm install
 
       - name: Run Palletforce sync
-  run: node index.js
-  env:
-    SHOPIFY_STORE: ${{ secrets.SHOPIFY_STORE }}
-    SHOPIFY_ADMIN_ACCESS_TOKEN: ${{ secrets.SHOPIFY_ADMIN_ACCESS_TOKEN }}
-    SHOPIFY_API_VERSION: 2024-01
-    PALLETFORCE_URL: https://apiuat.palletforce.net/api/ExternalScanning/DownloadTracking
-    PALLETFORCE_ACCESS_KEY: ${{ secrets.PALLETFORCE_ACCESS_KEY }}
-
-
-           # 🔽 TEST MODE (REQUIRED)
-          TEST_MODE: ${{ secrets.TEST_MODE }}
-          TEST_ORDER_ID: ${{ secrets.TEST_ORDER_ID }}
+        run: node index.js
+        env:
+          SHOPIFY_STORE: ${{ secrets.SHOPIFY_STORE }}
+          SHOPIFY_ADMIN_ACCESS_TOKEN: ${{ secrets.SHOPIFY_ADMIN_ACCESS_TOKEN }}
+          SHOPIFY_API_VERSION: 2024-01
+          PALLETFORCE_URL: https://apiuat.palletforce.net/api/ExternalScanning/DownloadTracking
+          PALLETFORCE_ACCESS_KEY: ${{ secrets.PALLETFORCE_ACCESS_KEY }}
