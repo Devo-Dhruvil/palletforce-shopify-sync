@@ -6,11 +6,12 @@ const {
   SHOPIFY_ADMIN_ACCESS_TOKEN,
   SHOPIFY_API_VERSION,
   PALLETFORCE_URL,
-  PALLETFORCE_ACCESS_KEY
+  PALLETFORCE_ACCESS_KEY,
+  TEST_ORDER_ID
 } = process.env;
 
 // =====================
-// SHOPIFY CONNECTION
+// SHOPIFY CLIENT
 // =====================
 const shopify = axios.create({
   baseURL: `https://${SHOPIFY_STORE}/admin/api/${SHOPIFY_API_VERSION}`,
@@ -43,15 +44,14 @@ async function getOrders() {
 }
 
 // =====================
-// GET METAFIELD TRACKING
+// GET TRACKING FROM META
 // =====================
 async function getTrackingFromMetafield(orderId) {
-  const res = await shopify.get(
-    `/orders/${orderId}/metafields.json`
-  );
+  const res = await shopify.get(`/orders/${orderId}/metafields.json`);
 
   const mf = res.data.metafields.find(
-    m => m.namespace === "custom" && m.key === "palletforce_tracking"
+    m => m.namespace === "custom" &&
+         m.key === "palletforce_tracking"
   );
 
   return mf?.value || null;
@@ -70,13 +70,36 @@ async function getTrackingStatus(trackingNumber) {
 }
 
 // =====================
-// SAVE TRACKING (SAFE)
+// UPDATE TAG
 // =====================
+async function updateOrderTag(order, newTag) {
+  if (order.tags?.includes(newTag)) {
+    console.log(`⏭ Tag already ${newTag}`);
+    return;
+  }
 
- // ===============================
-// SAVE TRACKING TO SHOPIFY (OPTION A – SAFE)
-// ===============================
+  let tags = order.tags ? order.tags.split(", ") : [];
+  tags = tags.filter(t => !STATUS_TAGS.includes(t));
+  tags.push(newTag);
+
+  await shopify.put(`/orders/${order.id}.json`, {
+    order: { id: order.id, tags: tags.join(", ") }
+  });
+
+  console.log(`✅ Tag updated → ${newTag}`);
+}
+
+// =====================
+// CREATE TRACKING
+// =====================
 async function saveTrackingToShopify(orderId, trackingNumber) {
+
+  const orderRes = await shopify.get(`/orders/${orderId}.json`);
+
+  if (orderRes.data.order.fulfillments?.length) {
+    console.log("⏭ Already fulfilled — skip tracking create");
+    return;
+  }
 
   const foRes = await shopify.get(
     `/orders/${orderId}/fulfillment_orders.json`
@@ -87,9 +110,7 @@ async function saveTrackingToShopify(orderId, trackingNumber) {
   );
 
   if (!fulfillmentOrder) {
-    console.log(
-      `⏭ Order ${orderId}: Fulfillment not open — skipping tracking`
-    );
+    console.log("⏭ No open fulfillment order");
     return;
   }
 
@@ -107,46 +128,52 @@ async function saveTrackingToShopify(orderId, trackingNumber) {
     }
   });
 
-  console.log(`✅ Tracking created for order ${orderId}`);
-}
-
-
-// =====================
-// UPDATE TAG
-// =====================
-async function updateOrderTag(order, newTag) {
-  if (order.tags?.includes(newTag)) {
-    console.log(`⏭ Order ${order.id}: Tag already ${newTag}`);
-    return;
-  }
-
-  let tags = order.tags ? order.tags.split(", ") : [];
-  tags = tags.filter(t => !STATUS_TAGS.includes(t));
-  tags.push(newTag);
-
-  await shopify.put(`/orders/${order.id}.json`, {
-    order: { id: order.id, tags: tags.join(", ") }
-  });
+  console.log("📦 Fulfillment created with tracking");
 }
 
 // =====================
-// MAIN
+// MAIN RUN
 // =====================
 async function run() {
+
   console.log("⏳ Palletforce sync started");
 
-  const orders = await getOrders();
+  const allOrders = await getOrders();
+
+  const orders = TEST_ORDER_ID
+    ? allOrders.filter(o => String(o.id) === String(TEST_ORDER_ID))
+    : allOrders;
 
   for (const order of orders) {
+
+    console.log("🔎 Checking order:", order.id);
+
     const trackingNumber = await getTrackingFromMetafield(order.id);
-    if (!trackingNumber) continue;
+
+    if (!trackingNumber) {
+      console.log("⏭ No tracking metafield");
+      continue;
+    }
+
+    console.log("📦 Tracking:", trackingNumber);
 
     const trackingData = await getTrackingStatus(trackingNumber);
-    if (!trackingData.length) continue;
+
+    if (!trackingData.length) {
+      console.log("⏭ No Palletforce data");
+      continue;
+    }
 
     const latestEvent = trackingData[trackingData.length - 1];
+
+    console.log("🚚 Event:", latestEvent.eventCode);
+
     const newTag = EVENT_TAG_MAP[latestEvent.eventCode];
-    if (!newTag) continue;
+
+    if (!newTag) {
+      console.log("⏭ Unknown event");
+      continue;
+    }
 
     await updateOrderTag(order, newTag);
 
@@ -157,7 +184,7 @@ async function run() {
       await saveTrackingToShopify(order.id, trackingNumber);
     }
 
-    console.log(`✔ Order ${order.id} → ${newTag}`);
+    console.log(`✔ Done → ${order.id}`);
   }
 
   console.log("✅ Sync finished");
