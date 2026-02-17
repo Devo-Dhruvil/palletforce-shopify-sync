@@ -28,7 +28,7 @@ const TEST_ORDER_ID = "12352360841547";
 // 🔴 FAKE PALLETFORCE RESPONSE
 const MOCK_TRACKING_DATA = [
   {
-    eventCode: "ARRH",
+    eventCode: "POD",
     trackingNumber: "1210225624682"
   }
 ];
