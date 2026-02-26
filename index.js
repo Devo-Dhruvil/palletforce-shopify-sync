@@ -81,8 +81,22 @@ async function run() {
 
   console.log("🧪 Manual test running");
 
-  const orderRes = await shopify.get(`/orders/${TEST_ORDER_ID}.json`);
-  const order = orderRes.data.order;
+ //  const orderRes = await shopify.get(`/orders/${TEST_ORDER_ID}.json`);
+
+const orderRes = await shopify.get(`/orders.json`, {
+  params: {
+    name: `#${TEST_ORDER_ID}`,
+    status: "any"
+  }
+});
+
+if (!orderRes.data.orders.length) {
+  console.log("❌ Order not found");
+  return;
+}
+
+const order = orderRes.data.orders[0];
+  //  const order = orderRes.data.order;
 
   const latestEvent = MOCK_TRACKING_DATA[0];
 
