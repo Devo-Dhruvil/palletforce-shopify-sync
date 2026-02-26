@@ -43,7 +43,9 @@ const MOCK_TRACKING_DATA = [
 
   tags = tags.filter(t => !STATUS_TAGS.includes(t));
 
+if (!tags.includes(newTag)) {
   tags.push(newTag);
+}
 
   console.log("After:", tags);
 
