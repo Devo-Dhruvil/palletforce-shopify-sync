@@ -23,13 +23,13 @@ const EVENT_TAG_MAP = {
 const STATUS_TAGS = Object.values(EVENT_TAG_MAP);
 
 // 🔴 CHANGE THIS ORDER ID TO TEST
-const TEST_ORDER_ID = "12397845938507";
+const TEST_ORDER_ID = "1141";
 
 // 🔴 FAKE PALLETFORCE RESPONSE
 const MOCK_TRACKING_DATA = [
   {
     eventCode: "POD",
-    trackingNumber: "1210225625514"
+    trackingNumber: "1210225625509"
   }
 ];
 
