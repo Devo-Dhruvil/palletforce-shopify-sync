@@ -33,21 +33,21 @@ const MOCK_TRACKING_DATA = [
   }
 ];
 
- async function updateOrderTag(order, newTag) {
+async function updateOrderTag(order, newTag) {
 
   let tags = order.tags
     ? order.tags.split(",").map(t => t.trim())
     : [];
 
-  console.log("Before:", tags);
+  console.log("Raw:", tags);
 
-  tags = tags.filter(t => !STATUS_TAGS.includes(t));
+  // Remove ALL status_* tags completely
+  tags = tags.filter(t => !t.toLowerCase().startsWith("status_"));
 
-if (!tags.includes(newTag)) {
+  // Add new tag
   tags.push(newTag);
-}
 
-  console.log("After:", tags);
+  console.log("Final:", tags);
 
   await shopify.put(`/orders/${order.id}.json`, {
     order: {
