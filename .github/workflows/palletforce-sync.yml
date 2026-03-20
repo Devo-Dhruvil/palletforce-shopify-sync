@@ -1,8 +1,6 @@
 name: Palletforce Shopify Sync
 
-on:
-# //  schedule:
-# //    - cron: "0 * * * *"   # Every 1 hour
+on: 
   workflow_dispatch:
 
 jobs:
